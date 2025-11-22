@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: road_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: road_inspection
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql
+    networks:
+      - roadnet
+
+  pipeline:
+    build: ./pipeline
+    container_name: road_pipeline
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./pipeline/weights:/app/weights
+    environment:
+      YOLO_WEIGHTS: /app/weights/road_defects.pt
+    networks:
+      - roadnet
+
+  backend:
+    build: ./backend
+    container_name: road_backend
+    environment:
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_HOST: postgres
+      DB_NAME: road_inspection
+      PIPELINE_URL: http://pipeline:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - pipeline
+    networks:
+      - roadnet
+  
+  seed_on_start:
+    image: node:20
+    container_name: road_seed_once
+    working_dir: /app
+    volumes:
+      - ./db:/app
+    command: ["sh", "-c", "npm install && sleep 2 && node seed_data.js"]
+    environment:
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_HOST: postgres
+      DB_NAME: road_inspection
+    depends_on:
+      - postgres
+    networks:
+      - roadnet
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: road_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://backend:3000" 
+    depends_on:
+      - backend
+    networks:
+      - roadnet
+  
+
+networks:
+  roadnet:
+    driver: bridge

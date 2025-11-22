@@ -1,0 +1,8 @@
+numpy
+opencv-python
+supervision
+ultralytics
+fastapi
+uvicorn[standard]
+python-multipart
+gpxpy
