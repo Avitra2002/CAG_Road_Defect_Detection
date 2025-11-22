@@ -15,3 +15,4 @@ build/
 
 # PyTest cache
 .pytest_cache/
+data/
